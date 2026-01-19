@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Seat Position Configurator</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f3f4f6;
+      color: #1f2937;
+      overflow: hidden;
+    }
+
+    /* Mimic main app's TopBar */
+    .fake-topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 2rem;
+      background-color: #ffffff;
+      border-bottom: 2px solid #e5e7eb;
+    }
+
+    .fake-topbar .time {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: #1f2937;
+    }
+
+    .fake-topbar .stats {
+      display: flex;
+      gap: 2rem;
+      font-size: 1.2rem;
+      color: #4b5563;
+    }
+
+    /* Mimic main app's LayoutControls */
+    .fake-controls {
+      display: flex;
+      gap: 1rem;
+      padding: 1rem 2rem;
+      background-color: #ffffff;
+      border-bottom: 1px solid #e5e7eb;
+      align-items: center;
+    }
+
+    .fake-controls button {
+      padding: 8px 16px;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      background: #ffffff;
+      color: #374151;
+    }
+
+    .fake-controls button:hover {
+      background: #f9fafb;
+    }
+
+    .btn-primary {
+      background: #3b82f6 !important;
+      color: white !important;
+      border-color: #3b82f6 !important;
+    }
+
+    .btn-primary:hover {
+      background: #2563eb !important;
+    }
+
+    .btn-success {
+      background: #10b981 !important;
+      color: white !important;
+      border-color: #10b981 !important;
+    }
+
+    .btn-success:hover {
+      background: #059669 !important;
+    }
+
+    .btn-danger {
+      background: #ef4444 !important;
+      color: white !important;
+      border-color: #ef4444 !important;
+    }
+
+    .btn-danger:hover {
+      background: #dc2626 !important;
+    }
+
+    .seat-count {
+      margin-left: auto;
+      font-size: 14px;
+      color: #6b7280;
+    }
+
+    /* New Flexbox-based layout screen to mimic app */
+    .config-layout-screen {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      width: 100%;
+      background-color: #f3f4f6;
+    }
+
+    /* Canvas area - now a flex item */
+    .canvas-container {
+      position: relative;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .canvas-scaled {
+      position: relative;
+      width: 1920px;
+      height: 1080px;
+      transform-origin: top left;
+    }
+
+    .room-layout-background {
+      position: absolute;
+      top: 50%;
+      left: 59%;
+      transform: translate(-50%, -50%) scale(1.45);
+      width: auto;
+      height: auto;
+      object-fit: contain;
+      opacity: 1;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .seat {
+      position: absolute;
+      width: 55px;
+      height: 35px;
+      background: #cbd5e1;
+      border: 2px solid #64748b;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: move;
+      font-size: 12px;
+      font-weight: 600;
+      color: #1e293b;
+      user-select: none;
+      z-index: 10;
+      transition: box-shadow 0.2s;
+    }
+
+    .seat:hover {
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5);
+    }
+
+    .seat.dragging {
+      opacity: 0.8;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+      z-index: 100;
+    }
+
+    .seat.selected {
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+    }
+
+    /* Floating panel (toggle-able) */
+    .floating-panel {
+      position: fixed;
+      top: 120px;
+      right: 20px;
+      width: 320px;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+      z-index: 1000;
+      max-height: calc(100vh - 140px);
+      overflow-y: auto;
+      display: none;
+    }
+
+    .floating-panel.visible {
+      display: block;
+    }
+
+    .floating-panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 16px;
+      background: #f9fafb;
+      border-bottom: 1px solid #e5e7eb;
+      border-radius: 8px 8px 0 0;
+    }
+
+    .floating-panel-header h3 {
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .floating-panel-close {
+      background: none;
+      border: none;
+      font-size: 20px;
+      cursor: pointer;
+      color: #6b7280;
+    }
+
+    .floating-panel-content {
+      padding: 16px;
+    }
+
+    .export-output {
+      width: 100%;
+      height: 250px;
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+      color: #059669;
+      font-family: 'Monaco', 'Consolas', monospace;
+      font-size: 11px;
+      padding: 10px;
+      resize: vertical;
+      margin-bottom: 10px;
+    }
+
+    .coord-display {
+      position: fixed;
+      bottom: 20px;
+      left: 20px;
+      background: rgba(0,0,0,0.8);
+      color: white;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-family: monospace;
+      z-index: 1000;
+    }
+
+    .instructions-mini {
+      font-size: 11px;
+      color: #6b7280;
+      margin-bottom: 12px;
+      line-height: 1.5;
+    }
+
+    .offset-controls {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .offset-group {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+    }
+
+    .offset-group label {
+      font-size: 11px;
+      color: #4b5563;
+      margin-bottom: 4px;
+    }
+
+    .offset-group input {
+      width: 100%;
+      padding: 6px 8px;
+      border: 1px solid #d1d5db;
+      border-radius: 4px;
+      font-size: 14px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="config-layout-screen">
+    <!-- Fake TopBar (mimics main app) -->
+    <div class="fake-topbar">
+      <div class="time">CONFIGURATOR</div>
+      <div class="stats">
+        <span>Drag seats to position</span>
+        <span>Arrow keys for fine-tune</span>
+      </div>
+      <div style="color: #10b981; font-weight: 500;">Development Tool</div>
+    </div>
+
+    <!-- Fake Controls (mimics main app) -->
+    <div class="fake-controls">
+      <button class="btn-primary" onclick="addSeat()">+ Add Seat</button>
+      <button onclick="addMultipleSeats(10)">+10 Seats</button>
+      <button onclick="loadCurrentConfig()">Load Example Config</button>
+      <button class="btn-danger" onclick="deleteSelected()">Delete</button>
+      <button onclick="clearAll()">Clear All</button>
+      <button class="btn-success" onclick="toggleExportPanel()">Export</button>
+      <span class="seat-count">Seats: <span id="seatCount">0</span></span>
+    </div>
+
+    <!-- Canvas (same dimensions as main app) -->
+    <div class="canvas-container" id="canvasContainer">
+      <div class="canvas-scaled" id="canvasScaled">
+        <img src="../src/assets/layout-svg-min.svg" class="room-layout-background" alt="Room Layout">
+        <div id="seatsContainer"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Floating Export Panel -->
+  <div class="floating-panel" id="exportPanel">
+    <div class="floating-panel-header">
+      <h3>Export Configuration</h3>
+      <button class="floating-panel-close" onclick="toggleExportPanel()">&times;</button>
+    </div>
+    <div class="floating-panel-content">
+      <div class="instructions-mini">
+        Click "Generate" then copy the code to <code>src/config/seatPositions.ts</code>
+      </div>
+      <button class="btn-primary" style="width: 100%; margin-bottom: 10px;" onclick="exportConfig()">Generate Config</button>
+      <textarea id="exportOutput" class="export-output" readonly placeholder="Click 'Generate Config'..."></textarea>
+      <button class="btn-success" style="width: 100%;" onclick="copyToClipboard()">Copy to Clipboard</button>
+    </div>
+  </div>
+
+  <div class="coord-display">
+    Mouse: <span id="mouseCoords">0, 0</span> | Selected: <span id="selectedCoords">None</span>
+  </div>
+
+  <script>
+    // State
+    let seats = [];
+    let selectedSeatId = null;
+    let nextId = 1;
+    let scale = 1;
+    let isDragging = false;
+    let dragOffset = { x: 0, y: 0 };
+    let dragSeatId = null;
+
+    // Current config from seatPositions.ts (update this to load existing config)
+    const CURRENT_CONFIG = [
+      { id: 1, x: 335, y: 440 },
+      { id: 2, x: 395, y: 440 },
+      { id: 3, x: 455, y: 440 },
+      { id: 4, x: 520, y: 440 },
+      { id: 5, x: 585, y: 440 },
+      { id: 6, x: 650, y: 440 },
+      { id: 7, x: 710, y: 440 },
+      { id: 8, x: 780, y: 440 },
+      { id: 9, x: 840, y: 440 },
+      { id: 10, x: 910, y: 440 },
+      { id: 11, x: 970, y: 440 },
+      { id: 12, x: 1035, y: 440 },
+      { id: 13, x: 1095, y: 440 },
+      { id: 14, x: 1165, y: 440 },
+      { id: 15, x: 1225, y: 440 },
+      { id: 16, x: 1290, y: 440 },
+      { id: 17, x: 1350, y: 440 },
+      { id: 18, x: 1420, y: 440 },
+      { id: 19, x: 1480, y: 440 },
+      { id: 20, x: 1545, y: 440 },
+      { id: 21, x: 1605, y: 440 },
+      { id: 22, x: 1675, y: 440 },
+      { id: 23, x: 1735, y: 440 },
+      { id: 24, x: 1800, y: 440 },
+
+      // Row 2 - 3 seats
+      { id: 25, x: 1800, y: 480 },
+      { id: 26, x: 1800, y: 520 },
+      { id: 27, x: 1800, y: 560 },
+
+      // Row 3 - 24 seats
+      { id: 28, x: 1800, y: 600 },
+      { id: 29, x: 1735, y: 600 },
+      { id: 30, x: 1675, y: 600 },
+      { id: 31, x: 1605, y: 600 },
+      { id: 32, x: 1545, y: 600 },
+      { id: 33, x: 1480, y: 600 },
+      { id: 34, x: 1420, y: 600 },
+      { id: 35, x: 1350, y: 600 },
+      { id: 36, x: 1290, y: 600 },
+      { id: 37, x: 1225, y: 600 },
+      { id: 38, x: 1165, y: 600 },
+      { id: 39, x: 1095, y: 600 },
+      { id: 40, x: 1035, y: 600 },
+      { id: 41, x: 970, y: 600 },
+      { id: 42, x: 910, y: 600 },
+      { id: 43, x: 840, y: 600 },
+      { id: 44, x: 780, y: 600 },
+      { id: 45, x: 710, y: 600 },
+      { id: 46, x: 650, y: 600 },
+      { id: 47, x: 585, y: 600 },
+      { id: 48, x: 520, y: 600 },
+      { id: 49, x: 455, y: 600 },
+      { id: 50, x: 395, y: 600 },
+      { id: 51, x: 335, y: 600 },
+    ];
+
+    // DOM elements
+    const canvasContainer = document.getElementById('canvasContainer');
+    const canvasScaled = document.getElementById('canvasScaled');
+    const seatsContainer = document.getElementById('seatsContainer');
+    const seatCountEl = document.getElementById('seatCount');
+    const mouseCoordsEl = document.getElementById('mouseCoords');
+    const selectedCoordsEl = document.getElementById('selectedCoords');
+    const exportOutput = document.getElementById('exportOutput');
+    const exportPanel = document.getElementById('exportPanel');
+
+    // Initialize
+    function init() {
+      updateScale();
+      window.addEventListener('resize', updateScale);
+
+      canvasContainer.addEventListener('mousemove', handleMouseMove);
+      canvasContainer.addEventListener('mouseup', handleMouseUp);
+      canvasContainer.addEventListener('mouseleave', handleMouseUp);
+
+      document.addEventListener('keydown', handleKeyDown);
+    }
+
+    function updateScale() {
+      const containerWidth = canvasContainer.clientWidth;
+      const containerHeight = canvasContainer.clientHeight;
+      const scaleX = containerWidth / 1920;
+      const scaleY = containerHeight / 1080;
+      scale = Math.min(scaleX, scaleY);
+      canvasScaled.style.transform = 'scale(' + scale + ')';
+    }
+
+    function toggleExportPanel() {
+      exportPanel.classList.toggle('visible');
+    }
+
+    function addSeat() {
+      const id = nextId++;
+      const seat = {
+        id: id,
+        x: 960 + Math.random() * 100 - 50,
+        y: 540 + Math.random() * 100 - 50
+      };
+      seats.push(seat);
+      renderSeat(seat);
+      updateSeatCount();
+    }
+
+    function addMultipleSeats(count) {
+      for (let i = 0; i < count; i++) {
+        addSeat();
+      }
+    }
+
+    function renderSeat(seat) {
+      const el = document.createElement('div');
+      el.className = 'seat';
+      el.id = 'seat-' + seat.id;
+      el.textContent = seat.id;
+      el.style.left = seat.x + 'px';
+      el.style.top = seat.y + 'px';
+
+      el.addEventListener('mousedown', function(e) { handleMouseDown(e, seat.id); });
+      el.addEventListener('click', function(e) {
+        e.stopPropagation();
+        selectSeat(seat.id);
+      });
+
+      seatsContainer.appendChild(el);
+    }
+
+    function renderAllSeats() {
+      while (seatsContainer.firstChild) {
+        seatsContainer.removeChild(seatsContainer.firstChild);
+      }
+      seats.forEach(function(seat) { renderSeat(seat); });
+      updateSeatCount();
+    }
+
+    function updateSeatPosition(id, x, y) {
+      const seat = seats.find(function(s) { return s.id === id; });
+      if (seat) {
+        seat.x = Math.round(x);
+        seat.y = Math.round(y);
+        const el = document.getElementById('seat-' + id);
+        if (el) {
+          el.style.left = seat.x + 'px';
+          el.style.top = seat.y + 'px';
+        }
+        updateSelectedCoords();
+      }
+    }
+
+    function selectSeat(id) {
+      if (selectedSeatId !== null) {
+        const prevEl = document.getElementById('seat-' + selectedSeatId);
+        if (prevEl) prevEl.classList.remove('selected');
+      }
+
+      selectedSeatId = id;
+      const el = document.getElementById('seat-' + id);
+      if (el) el.classList.add('selected');
+
+      updateSelectedCoords();
+    }
+
+    function deleteSelected() {
+      if (selectedSeatId === null) return;
+
+      const el = document.getElementById('seat-' + selectedSeatId);
+      if (el) el.remove();
+
+      seats = seats.filter(function(s) { return s.id !== selectedSeatId; });
+      selectedSeatId = null;
+      updateSeatCount();
+      updateSelectedCoords();
+    }
+
+    function clearAll() {
+      if (!confirm('Clear all seats?')) return;
+      seats = [];
+      selectedSeatId = null;
+      while (seatsContainer.firstChild) {
+        seatsContainer.removeChild(seatsContainer.firstChild);
+      }
+      updateSeatCount();
+      updateSelectedCoords();
+    }
+
+    function handleMouseDown(e, seatId) {
+      isDragging = true;
+      dragSeatId = seatId;
+
+      const seat = seats.find(function(s) { return s.id === seatId; });
+      const rect = canvasScaled.getBoundingClientRect();
+      const mouseX = (e.clientX - rect.left) / scale;
+      const mouseY = (e.clientY - rect.top) / scale;
+
+      dragOffset.x = mouseX - seat.x;
+      dragOffset.y = mouseY - seat.y;
+
+      const el = document.getElementById('seat-' + seatId);
+      if (el) el.classList.add('dragging');
+
+      selectSeat(seatId);
+    }
+
+    function handleMouseMove(e) {
+      const rect = canvasScaled.getBoundingClientRect();
+      const mouseX = Math.round((e.clientX - rect.left) / scale);
+      const mouseY = Math.round((e.clientY - rect.top) / scale);
+
+      mouseCoordsEl.textContent = mouseX + ', ' + mouseY;
+
+      if (isDragging && dragSeatId !== null) {
+        const newX = mouseX - dragOffset.x;
+        const newY = mouseY - dragOffset.y;
+        updateSeatPosition(dragSeatId, newX, newY);
+      }
+    }
+
+    function handleMouseUp() {
+      if (isDragging && dragSeatId !== null) {
+        const el = document.getElementById('seat-' + dragSeatId);
+        if (el) el.classList.remove('dragging');
+      }
+      isDragging = false;
+      dragSeatId = null;
+    }
+
+    function handleKeyDown(e) {
+      if (selectedSeatId === null) return;
+
+      const seat = seats.find(function(s) { return s.id === selectedSeatId; });
+      if (!seat) return;
+
+      const step = e.shiftKey ? 10 : 1;
+
+      switch (e.key) {
+        case 'ArrowUp':
+          e.preventDefault();
+          updateSeatPosition(selectedSeatId, seat.x, seat.y - step);
+          break;
+        case 'ArrowDown':
+          e.preventDefault();
+          updateSeatPosition(selectedSeatId, seat.x, seat.y + step);
+          break;
+        case 'ArrowLeft':
+          e.preventDefault();
+          updateSeatPosition(selectedSeatId, seat.x - step, seat.y);
+          break;
+        case 'ArrowRight':
+          e.preventDefault();
+          updateSeatPosition(selectedSeatId, seat.x + step, seat.y);
+          break;
+        case 'Delete':
+        case 'Backspace':
+          e.preventDefault();
+          deleteSelected();
+          break;
+      }
+    }
+
+    function updateSeatCount() {
+      seatCountEl.textContent = seats.length;
+    }
+
+    function updateSelectedCoords() {
+      if (selectedSeatId === null) {
+        selectedCoordsEl.textContent = 'None';
+      } else {
+        const seat = seats.find(function(s) { return s.id === selectedSeatId; });
+        if (seat) {
+          selectedCoordsEl.textContent = '#' + seat.id + ': (' + seat.x + ', ' + seat.y + ')';
+        }
+      }
+    }
+
+    function exportConfig() {
+      var sortedSeats = seats.slice().sort(function(a, b) { return a.id - b.id; });
+
+      var output = '// Auto-generated by Seat Configurator\n';
+      output += '// Total seats: ' + sortedSeats.length + '\n\n';
+      output += 'export interface SeatPosition {\n';
+      output += '  id: number;\n';
+      output += '  x: number;\n';
+      output += '  y: number;\n';
+      output += '}\n\n';
+      output += 'const SEAT_POSITIONS: SeatPosition[] = [\n';
+
+      sortedSeats.forEach(function(seat, index) {
+        var comma = index < sortedSeats.length - 1 ? ',' : '';
+        output += '  { id: ' + seat.id + ', x: ' + seat.x + ', y: ' + seat.y + ' }' + comma + '\n';
+      });
+
+      output += '];\n\n';
+      output += 'export default SEAT_POSITIONS;\n';
+
+      exportOutput.value = output;
+    }
+
+    function copyToClipboard() {
+      exportOutput.select();
+      document.execCommand('copy');
+      alert('Copied to clipboard!');
+    }
+
+    function loadCurrentConfig() {
+      if (seats.length > 0 && !confirm('This will replace current seats. Continue?')) {
+        return;
+      }
+
+      seats = CURRENT_CONFIG.map(function(s) { return { id: s.id, x: s.x, y: s.y }; });
+      nextId = Math.max.apply(null, seats.map(function(s) { return s.id; })) + 1;
+      renderAllSeats();
+    }
+
+    // Start
+    init();
+  </script>
+</body>
+</html>
