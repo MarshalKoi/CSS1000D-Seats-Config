@@ -343,7 +343,7 @@
     let dragSeatId = null;
 
     // Current config from seatPositions.ts (update this to load existing config)
-const SEAT_POSITIONS: SeatPosition[] = [
+    const CURRENT_CONFIG = [
   { id: 1, x: 122, y: 740 },
   { id: 2, x: 122, y: 677 },
   { id: 3, x: 122, y: 612 },
@@ -398,8 +398,7 @@ const SEAT_POSITIONS: SeatPosition[] = [
   { id: 49, x: 455, y: 590 },
   { id: 50, x: 395, y: 590 },
   { id: 51, x: 332, y: 590 }
-];
-
+    ];
     // DOM elements
     const canvasContainer = document.getElementById('canvasContainer');
     const canvasScaled = document.getElementById('canvasScaled');
